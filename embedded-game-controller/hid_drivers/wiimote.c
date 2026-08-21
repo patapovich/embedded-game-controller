@@ -891,7 +891,8 @@ static void wm_parse_exp(egc_input_device_t *device, const u8 *data, egc_input_s
         accel->y = wm_accel_value(z, ac, 2);
         accel->z = -wm_accel_value(y, ac, 1);
     } else if (priv->exp_type == EGC_WIIMOTE_EXP_CLASSIC ||
-               priv->exp_type == EGC_WIIMOTE_EXP_CLASSIC_PRO) {
+               priv->exp_type == EGC_WIIMOTE_EXP_CLASSIC_PRO ||
+               priv->exp_type == EGC_WIIMOTE_EXP_CLASSIC_WIIU_PRO) {
         s16 value = wm_axis_value(data[0] & 0x3f, &priv->exp_cal.classic.l_stick_x);
         egc_device_driver_set_axis(state, EGC_GAMEPAD_AXIS_LEFTX, value);
         value = wm_axis_value(data[1] & 0x3f, &priv->exp_cal.classic.l_stick_y);
@@ -951,7 +952,8 @@ static bool wm_expansion_calibration_parse(egc_input_device_t *device, const u8 
         priv->exp_cal.nunchuck.stick_y.min = data[12];
         priv->exp_cal.nunchuck.stick_y.center = data[13];
     } else if (priv->exp_type == EGC_WIIMOTE_EXP_CLASSIC ||
-               priv->exp_type == EGC_WIIMOTE_EXP_CLASSIC_PRO) {
+               priv->exp_type == EGC_WIIMOTE_EXP_CLASSIC_PRO ||
+               priv->exp_type == EGC_WIIMOTE_EXP_CLASSIC_WIIU_PRO) {
         if (!wm_checksum(data, 15)) {
             return false;
         }
@@ -997,7 +999,8 @@ static void wm_expansion_setup(egc_input_device_t *device)
                                 BIT(EGC_GAMEPAD_AXIS_LEFTY);
         desc->num_accelerometers = 2;
     } else if (priv->exp_type == EGC_WIIMOTE_EXP_CLASSIC ||
-               priv->exp_type == EGC_WIIMOTE_EXP_CLASSIC_PRO) {
+               priv->exp_type == EGC_WIIMOTE_EXP_CLASSIC_PRO ||
+               priv->exp_type == EGC_WIIMOTE_EXP_CLASSIC_WIIU_PRO) {
         struct wm_exp_cal_classic_t *cal = &priv->exp_cal.classic;
         cal->l_stick_x.min = cal->l_stick_y.min = 0;
         cal->l_stick_x.max = cal->l_stick_y.max = 63;
