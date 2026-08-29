@@ -1,6 +1,8 @@
 #include "driver_api.h"
 #include "utils.h"
 
+#define GCA_DEBUG 0
+
 /* Nintendo GameCube Controller Adapter (WUP-028) and clones in native mode
  * (e.g. Mayflash set to "Wii U").
  *
@@ -100,6 +102,11 @@ static void intr_transfer_cb(egc_usb_transfer_t *transfer)
     const u8 *report = transfer->data;
     egc_input_state_t state = { 0 };
 
+#if GCA_DEBUG
+    LOG_INFO("gca: %02x | %02x %02x %02x %02x %02x %02x %02x %02x %02x | st=%d len=%d\n",
+             report[0], report[1], report[2], report[3], report[4], report[5], report[6], report[7],
+             report[8], report[9], transfer->status, transfer->length);
+#endif
     if (transfer->status == EGC_USB_TRANSFER_STATUS_COMPLETED && report[0] == 0x21) {
         /* use the first port with a controller plugged in */
         const u8 *pad = NULL;
@@ -144,13 +151,19 @@ static void intr_transfer_cb(egc_usb_transfer_t *transfer)
 
 static int gca_request_data(egc_input_device_t *device)
 {
-    const egc_usb_transfer_t *transfer =
-        egc_device_driver_issue_intr_transfer_async(device, GCA_EP_IN, NULL, 0, intr_transfer_cb);
+    /* Request exactly the report size: bigger requests complete with an
+     * overflow/error status on some USB stacks. */
+    static u8 report_buf[GCA_REPORT_SIZE];
+    const egc_usb_transfer_t *transfer = egc_device_driver_issue_intr_transfer_async(
+        device, GCA_EP_IN, report_buf, GCA_REPORT_SIZE, intr_transfer_cb);
     return transfer != NULL ? 0 : -1;
 }
 
 static void start_polling_cb(egc_usb_transfer_t *transfer)
 {
+#if GCA_DEBUG
+    LOG_INFO("gca: poll cmd sent, status=%d\n", transfer->status);
+#endif
     gca_request_data(transfer->device);
 }
 
@@ -160,13 +173,16 @@ static bool gca_driver_ops_probe(u16 vid, u16 pid)
         { 0x057e, 0x0337 }, /* Nintendo | GameCube Controller Adapter */
     };
 
-    return egc_device_driver_is_compatible(vid, pid, compatible, ARRAY_SIZE(compatible));
+    bool ok = egc_device_driver_is_compatible(vid, pid, compatible, ARRAY_SIZE(compatible));
+    LOG_INFO("gca: probe %04x:%04x -> %d\n", vid, pid, ok);
+    return ok;
 }
 
 static int gca_driver_ops_init(egc_input_device_t *device, u16 vid, u16 pid)
 {
     struct gca_private_data_t *priv = (void *)device->private_data;
 
+    LOG_INFO("gca: init called\n");
     priv->active_port = 0;
     priv->rumble_on = false;
     device->desc = &s_device_description;
@@ -179,6 +195,9 @@ static int gca_driver_ops_init(egc_input_device_t *device, u16 vid, u16 pid)
 static bool gca_driver_ops_timer(egc_input_device_t *device)
 {
     static u8 poll_cmd[1] = { 0x13 };
+#if GCA_DEBUG
+    LOG_INFO("gca: timer fired, sending poll cmd\n");
+#endif
     egc_device_driver_issue_intr_transfer_async(device, GCA_EP_OUT, poll_cmd, sizeof(poll_cmd),
                                                 start_polling_cb);
     /* Return false to destroy the timer */
